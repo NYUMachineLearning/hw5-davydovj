@@ -1,0 +1,88 @@
+---
+title: 'Machine Learning 2019: Tree-Based Methods'
+author: "Sonali Narang"
+date: "10/28/2019"
+output:
+  html_document:
+    df_print: paged
+  pdf: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load relevant libraries, include=FALSE}
+install.packages("ISLR")
+install.packages("tree")
+install.packages("gbm")
+library(tidyverse)
+library(ISLR)
+library(tree)
+library(randomForest)
+library(MASS)
+library(gbm)
+library(mlbench)
+library(rpart)
+install.packages("rpart.plot")
+library(rpart.plot)
+```
+
+1. Attempt a regression tree-based method (not covered in this tutorial) on a reasonable dataset of your choice. Explain the results. 
+```{r}
+set.seed(1127)
+
+data("PimaIndiansDiabetes2")
+Pima <- na.omit(PimaIndiansDiabetes2)
+#Here we have omitted any rows with NA values, dropping us to 392 rows from 768. Acknowledging this is not ideal but easier to work with for the sake of this homework. 
+
+n <- 0.70*nrow(Pima) #Creating variable 'n' to ennumerate 70% of dataset rows
+trainsmp <- sample(nrow(Pima), size = n, replace = FALSE) #Sampling random rows and saving as variable
+
+Pima_train <- Pima[trainsmp,][,1:9] #Training dataset
+Pima_test <- Pima[-trainsmp,][,1:9] #Test dataset
+```
+
+```{r}
+#Creating a regression tree using the rpart function, modeling diabetes variable on the rest of dataset.
+tree <- rpart(diabetes ~ ., data = Pima_train, method = "class") 
+rpart.plot(tree, main = "Diabetes Regression Tree", tweak = 1.2) #Rpart tree plot
+
+summary(tree)
+#Summarizing our tree model shows variable importance and numerically how nodes were split. Glucose is most important variable followed by age, insulin, and triceps.
+```
+
+2. Attempt both a bagging and boosting method on a reasonable dataset of your choice. Explain the results.
+
+```{r}
+library(ipred)
+library(caret)
+set.seed(1127)
+
+Pima_bagg <- bagging(diabetes ~ ., data = Pima_train)
+
+varImp(Pima_bagg)
+#Using a bagging function on the Pima training dataset, and running the variable importance function, we find that the most important variables are still glucose, age, and insulin, with the 4th most important being mass as compared to without using a bagging method where triceps are the 4th most important. 
+```
+
+```{r}
+set.seed(1127)
+#cat <- ifelse(diabetes = yes, 1, 0)
+Pima_boost <- gbm(diabetes ~ ., data = Pima_train, n.trees = 5000, distribution = "gaussian")
+Pima_boost
+
+summary(Pima_boost)
+
+n.trees = seq(from = 100, to = 5000, by = 100)
+matrixpredict <- predict(Pima_boost, newdata= Pima_test, n.trees=n.trees) 
+# Boosting Error Plot
+bst.err <- with(Pima_test, apply((matrixpredict - as.numeric(Pima$diabetes))^2, 2, mean) )
+plot(n.trees, bst.err, ylab = "Mean Squared Error", xlab = "# Trees", main = "Boosting Test Error")
+abline(h = min(bst.err), col = "red")
+
+#Here we are using boosting on our Pima dataset and confirm that again glucose and age are two of the most important variables used in our model. When plotting the number of trees used vs MSE, we see a generally disorderly graph with a general positive linear trend. This confirms that our dataset does not have a high variance and is not benefiting from using a boosting method. 
+```
+
+
